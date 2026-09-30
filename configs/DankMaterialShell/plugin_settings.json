@@ -1,0 +1,9 @@
+{
+  "dankKDEConnect": {
+    "enabled": false,
+    "selectedDeviceId": ""
+  },
+  "notchWidget": {
+    "enabled": false
+  }
+}

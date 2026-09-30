@@ -1,0 +1,26 @@
+# Ignora file di chiavi private e certificati non cifrati
+*.pem
+*.key
+*.priv
+*id_rsa*
+*id_ed25519*
+*id_ecdsa*
+*.secret
+*.env
+*.env.*
+!.env.example
+
+# Ignora file di backup e temporanei
+*~
+*.swp
+*.bak
+*.tmp
+
+# Ignora chiavi o file di segreti in chiaro nella cartella secrets
+secrets/*
+!secrets/ssh-keys.tar.age
+!secrets/.gitkeep
+
+# Ignora socket temporanei
+*.sock
+*.socket
