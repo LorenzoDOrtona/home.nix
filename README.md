@@ -10,13 +10,13 @@ Configurazioni personali per ambiente Wayland su Apple Silicon (Fedora Asahi Lin
 | :--- | :--- | :--- |
 | **OS** | Fedora Asahi Remix 44 | Driver audio, notch, kernel Apple Silicon |
 | **Window Manager** | [Hyprland](https://hyprland.org/) | Wayland compositor per display Retina / ProMotion |
-| **Desktop Shell** | [DankMaterialShell](https://github.com/DankMaterialShell) | Shell moderna in QML / Material Design 3 |
+| **Desktop Shell** | [DankMaterialShell](https://github.com/DankMaterialShell) | Shell moderna in QML / Material Design 3 con Matugen |
 | **Terminal** | [Kitty](https://sw.kovidgoyal.net/kitty/) | Terminale GPU-accelerated con temi dinamici |
-| **Shell** | [Zsh](https://www.zsh.org/) | Configurazione ricca di alias e opzioni |
+| **Shell** | [Zsh](https://www.zsh.org/) | Configurazione ricca di alias, zoxide e opzioni |
 | **Editor** | [Neovim](https://neovim.io/) | LazyVim setup preconfigurato |
 | **Status Bar** | [Waybar](https://github.com/Alexays/Waybar) | Barra di stato alternativa/fallback |
-| **Package & Config Manager**| [Nix](https://nixos.org/) + [Home Manager](https://github.com/nix-community/home-manager) | Gestione dichiarativa di pacchetti e symlink |
-| **Gestione Segreti** | [age](https://github.com/FiloSottile/age) | Cifratura sicura delle chiavi SSH |
+| **Package & Config Manager** | [Nix](https://nixos.org/) + [Home Manager](https://github.com/nix-community/home-manager) | Gestione dichiarativa di pacchetti CLI e symlink |
+| **Gestione Segreti** | [age](https://github.com/FiloSottile/age) | Cifratura sicura delle chiavi SSH con passphrase |
 
 ---
 
@@ -25,29 +25,44 @@ Configurazioni personali per ambiente Wayland su Apple Silicon (Fedora Asahi Lin
 ```text
 dotfiles/
 ├── flake.nix             # Flake Nix: supporto sia per M2 (aarch64) che per x86_64
-├── home.nix              # Configurazione dichiarativa Home Manager (pacchetti e symlink)
-├── bootstrap.sh          # Script per il ripristino automatico da zero
-├── configs/              # Configurazioni vive e autosufficienti
+├── home.nix              # Configurazione dichiarativa Home Manager (pacchetti CLI e symlink)
+├── bootstrap.sh          # Script per il ripristino automatico da zero (Disaster Recovery)
+├── configs/              # File sorgente reali delle configurazioni
 │   ├── DankMaterialShell/# Impostazioni interfaccia (settings.json, plugin, temi)
-│   ├── hypr/             # Hyprland, hypridle, hyprlock
+│   ├── hypr/             # Hyprland, hypridle, hyprlock e impostazioni dms
 │   ├── kitty/            # Terminale Kitty
 │   ├── nvim/             # Neovim (LazyVim)
 │   ├── waybar/           # Configurazione Waybar
 │   └── zsh/              # File .zshrc
 ├── scripts/
-│   └── backup-ssh.sh     # Script per cifrare le chiavi SSH prima del commit
+│   ├── backup-ssh.sh     # Script per cifrare le chiavi SSH prima del commit
+│   └── fix-nix-service.sh# Script di supporto per il demone Nix
 └── secrets/
-    └── ssh-keys.tar.age  # Archivio cifrato delle chiavi SSH (sicuro da pushare su Git)
+    └── ssh-keys.tar.age  # Archivio cifrato delle chiavi SSH (sicuro da salvare su Git)
 ```
 
 ---
 
-## 🚨 Guida Disaster Recovery: Da Fedora pulita al tuo desktop in 5 minuti
+## ⚙️ Come Funziona il Sistema
 
-Se il computer viene formattato o ne configuri uno nuovo da zero:
+1. **`flake.nix`**: È l'entrypoint di Nix. Definisce le dipendenze esterne (`nixpkgs` e `home-manager`) ed espone la configurazione `"lollodo"` per architettura Apple Silicon (`aarch64-linux`) e `"lollodo-x86"` per PC standard.
+2. **`home.nix`**: Specifica l'elenco dei pacchetti CLI da installare (es. `neovim`, `matugen`, `zoxide`, `btop`, `kubectl`, ecc.) e mappa i symlink:
+   - `configs/hypr` $\rightarrow$ `~/.config/hypr`
+   - `configs/kitty` $\rightarrow$ `~/.config/kitty`
+   - `configs/nvim` $\rightarrow$ `~/.config/nvim`
+   - `configs/waybar` $\rightarrow$ `~/.config/waybar`
+   - `configs/DankMaterialShell` $\rightarrow$ `~/.config/DankMaterialShell`
+   - `configs/zsh/.zshrc` $\rightarrow$ `~/.zshrc`
+3. **Nix Store**: Tutti i pacchetti e i file di configurazione sono isolati e immutabili. Modificare i sorgenti in `configs/` e riapplicare la configurazione crea una nuova **generazione atomica** con possibilità di rollback immediato.
+
+---
+
+## 🚨 Disaster Recovery: Ripristino Rapido da Zero
+
+Se formatti il computer o configuri una nuova macchina Fedora da zero:
 
 ### 1. Installa Nix sul nuovo sistema
-Apri il terminale di Fedora ed esegui l'installer raccomandato:
+Apri il terminale ed esegui l'installer raccomandato di Determinate Systems:
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- run
 ```
@@ -63,24 +78,58 @@ cd ~/dotfiles
 ```bash
 ./bootstrap.sh
 ```
-Lo script si occuperà di:
-1. Verificare che Nix e i Flakes siano abilitati.
-2. Chiederti la password master per decifrare `secrets/ssh-keys.tar.age` e ripristinare tutte le chiavi in `~/.ssh/` con i corretti permessi (`600`/`644`).
-3. Rilevare se sei su Apple Silicon (`aarch64`) o PC Intel/AMD (`x86_64`).
-4. Applicare la configurazione Home Manager scaricando tutti i tool CLI e collegando i file in `~/.config/`.
+
+Lo script si occuperà automaticamente di:
+1. Verificare Nix e abilitare `flakes` e `nix-command` in `~/.config/nix/nix.conf`.
+2. Chiederti la password master per decifrare `secrets/ssh-keys.tar.age` e ripristinare le chiavi in `~/.ssh/` con i permessi corretti (`600`/`644`).
+3. Rilevare se sei su Apple Silicon (`aarch64`) o x86 (`x86_64`).
+4. Applicare Home Manager con `-b backup` (gestendo eventuali conflitti preesistenti).
 
 ---
 
-## 🔐 Gestione Chiavi SSH
+## 🔄 Manutenzione Quotidiana con Home Manager
+
+### Applicare modifiche ai dotfiles
+Dopo aver modificato file in `configs/` o aggiunto pacchetti in `home.nix`:
+```bash
+# IMPORTANTE: Nix Flakes legge solo i file tracciati da Git!
+git add .
+
+# Applica le modifiche:
+home-manager switch --flake ".#lollodo"
+```
+
+> [!NOTE]
+> In Zsh ricorda di mettere tra virgolette `".#lollodo"` per evitare l'errore `zsh: no match` dovuto al carattere `#`.
+
+### Aggiornare tutti i pacchetti Nix
+```bash
+nix flake update
+home-manager switch --flake ".#lollodo"
+```
+
+### Rollback (Tornare indietro se qualcosa non va)
+Home Manager salva lo storico di ogni switch:
+```bash
+# Per vedere lo storico delle generazioni:
+home-manager generations
+
+# Per fare il rollback alla versione precedente immediata:
+home-manager switch --rollback
+```
+
+---
+
+## 🔐 Gestione Sicura delle Chiavi SSH
 
 Le chiavi private **non sono mai salvate in chiaro su Git**. Sono archiviate in `secrets/ssh-keys.tar.age` usando **age** protetto da passphrase.
 
 ### Come aggiornare il backup delle chiavi SSH:
-Se generi una nuova chiave SSH o modifichi la configurazione:
+Se generi una nuova chiave SSH o modifichi la configurazione in `~/.ssh`:
 ```bash
 ./scripts/backup-ssh.sh
 ```
-Inserisci la tua passphrase, poi committa e pusha le modifiche:
+Inserisci la tua passphrase, poi committa e pusha su Git:
 ```bash
 git add secrets/ssh-keys.tar.age
 git commit -m "chore: update encrypted ssh keys"
@@ -92,32 +141,4 @@ git push
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 nix run nixpkgs#age -- -d secrets/ssh-keys.tar.age | tar -xz -C ~/.ssh
 chmod 600 ~/.ssh/* && chmod 644 ~/.ssh/*.pub
-```
-
----
-
-## 🔄 Manutenzione Quotidiana con Nix & Home Manager
-
-### Applicare modifiche ai dotfiles
-Dopo aver modificato file in `configs/` o aggiunto pacchetti in `home.nix`:
-```bash
-# Se aggiungi nuovi file a configs, segnalali prima a Git:
-git add .
-
-# Applica le modifiche:
-nix run github:nix-community/home-manager -- switch --flake .#lollodo
-```
-
-### Aggiornare tutti i pacchetti Nix all'ultima versione
-```bash
-nix flake update
-nix run github:nix-community/home-manager -- switch --flake .#lollodo
-```
-
-### Ripristino di una generazione precedente (Rollback immediato)
-Se un aggiornamento crea problemi a un tool:
-```bash
-home-manager generations
-# Per tornare indietro:
-/nix/var/nix/profiles/per-user/lollodo/home-manager-XX-link/activate
 ```

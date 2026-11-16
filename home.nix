@@ -21,11 +21,20 @@
     tree           # Visualizzatore alberi cartelle
     fastfetch      # Info di sistema nel terminale
     btop           # Monitor di risorse avanzato
+    bat            # Cat con syntax highlighting
+    zoxide         # Navigazione smart directory (usato in .zshrc)
 
-    # Strumenti di sviluppo
+    # Desktop Shell & Temi
+    matugen        # Generatore colori Material You (per DankMaterialShell)
+
+    # Strumenti di sviluppo e Cloud
     neovim         # Editor Neovim
     lazygit        # UI da terminale per Git
+    git            # Controllo versione Git
+    gh             # GitHub CLI
     kubectl        # Gestione cluster Kubernetes
+    k9s            # TUI per Kubernetes
+    docker-compose # Gestione container
   ];
 
   # Collegamento dichiarativo dei tuoi dotfiles
