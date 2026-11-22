@@ -311,6 +311,15 @@ hl.window_rule({
 	float = true,
 	move = "20 monitor_h-120",
 })
+-- Okular: se viene ridimensionato mentre il suo workspace è nascosto (es.
+-- spostando via la finestra affiancata) Qt non riceve frame callback e il
+-- PDF resta nero. render_unfocused gli fa credere di essere ancora visibile.
+hl.window_rule({
+	name = "okular-render-unfocused",
+	match = { class = "^org\\.kde\\.okular$" },
+	render_unfocused = true,
+})
+
 -- Floating rules for Network Manager
 hl.window_rule({
 	name = "float-network-manager",
@@ -386,6 +395,24 @@ for _, mod in ipairs({ "dms.colors", "dms.layout", "dms.cursor", "dms.binds-user
 		print("errore caricando " .. mod .. ": " .. tostring(err))
 	end
 end
+
+-- SUPER + O: Obsidian è single-instance (Electron), rilanciarlo riattiva la
+-- finestra sul suo workspace. Qui invece la portiamo nel workspace corrente,
+-- e la lanciamo solo se non è già aperta. Definito dopo dms.binds-user così
+-- vince anche se DMS rigenera quel file.
+hl.unbind("SUPER + O")
+hl.bind("SUPER + O", function()
+	local win = hl.get_windows({ class = "md.obsidian.Obsidian" })[1]
+	if not win then
+		hl.dispatch(hl.dsp.exec_cmd("obsidian"))
+		return
+	end
+	local ws = hl.get_active_workspace()
+	if ws and (not win.workspace or win.workspace.id ~= ws.id) then
+		hl.dispatch(hl.dsp.window.move({ workspace = ws.id, window = "address:" .. win.address, follow = false }))
+	end
+	hl.dispatch(hl.dsp.focus({ window = "address:" .. win.address }))
+end)
 
 -- dms/colors.lua contiene il colore primario estratto dallo sfondo (matugen).
 -- Lo trasformiamo in un gradiente che ruota (animazione "borderangle" sopra).
