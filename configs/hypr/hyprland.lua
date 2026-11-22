@@ -17,8 +17,8 @@ hl.monitor({
 hl.monitor({
 	output = "eDP-1",
 	mode = "preferred",
-	position = "640x1080",
-	scale = 2,
+	position = "480x1080", -- centrato sotto l'ultrawide (2560-1600)/2
+	scale = 1.6, -- 2560x1664 / 1.6 = 1600x1040 logici (prima 2 => tutto troppo grande)
 })
 
 ---------------------
@@ -34,6 +34,7 @@ local menu = "hyprlauncher"
 -------------------
 
 hl.on("hyprland.start", function()
+	hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE HYPRLAND_INSTANCE_SIGNATURE && systemctl --user start hyprland-session.target")
 	hl.exec_cmd("hyprlock")
 	hl.exec_cmd("dms run")
 	hl.exec_cmd("waypaper")
@@ -69,10 +70,7 @@ hl.config({
 
 		border_size = 2,
 
-		col = {
-			active_border = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 },
-			inactive_border = "rgba(595959aa)",
-		},
+		-- I colori dei bordi sono dinamici: vedi "COLORI DINAMICI" in fondo al file
 
 		resize_on_border = false,
 		allow_tearing = false,
@@ -134,6 +132,8 @@ hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" 
 hl.config({
 	dwindle = {
 		preserve_split = true,
+		-- nuove finestre: la prima occupa il 55% invece del 50% (1.0 = metà esatta, max 1.9)
+		default_split_ratio = 1.1,
 	},
 	master = {
 		new_status = "master",
@@ -209,6 +209,18 @@ hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up", hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down", hl.dsp.focus({ direction = "down" }))
+
+-- Sposta finestra (SUPER + SHIFT + frecce): mettendola sopra/sotto crei lo split verticale
+hl.bind(mainMod .. " + SHIFT + left", hl.dsp.window.move({ direction = "left" }))
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
+hl.bind(mainMod .. " + SHIFT + up", hl.dsp.window.move({ direction = "up" }))
+hl.bind(mainMod .. " + SHIFT + down", hl.dsp.window.move({ direction = "down" }))
+
+-- Ridimensiona finestra (SUPER + CTRL + frecce), tenendo premuto si ripete
+hl.bind(mainMod .. " + CTRL + left", hl.dsp.window.resize({ x = -40, y = 0, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + CTRL + right", hl.dsp.window.resize({ x = 40, y = 0, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + CTRL + up", hl.dsp.window.resize({ x = 0, y = -40, relative = true }), { repeating = true })
+hl.bind(mainMod .. " + CTRL + down", hl.dsp.window.resize({ x = 0, y = 40, relative = true }), { repeating = true })
 
 -- Workspaces
 for i = 1, 10 do
@@ -314,3 +326,88 @@ hl.window_rule({
 	float = true,
 	size = "600 450", -- Force window size
 })
+
+---------------------------------------
+---- WORKSPACE DINAMICI (compatta) ----
+---------------------------------------
+-- Quando un workspace si svuota e viene rimosso (es. il 4), le finestre dei
+-- workspace successivi scalano di uno (5 -> 4, 6 -> 5, ...), stile GNOME.
+
+local compacting = false
+
+local function compact_workspaces()
+	if compacting then
+		return
+	end
+	compacting = true
+
+	local ids = {}
+	for _, ws in ipairs(hl.get_workspaces()) do
+		if not ws.special and ws.id > 0 then
+			table.insert(ids, ws.id)
+		end
+	end
+	table.sort(ids)
+
+	local active = hl.get_active_workspace()
+	local active_id = active and active.id or nil
+	local new_active = nil
+
+	for idx, id in ipairs(ids) do
+		if id ~= idx then
+			for _, win in ipairs(hl.get_workspace_windows(id)) do
+				hl.dispatch(hl.dsp.window.move({ workspace = idx, window = "address:" .. win.address, follow = false }))
+			end
+			if id == active_id then
+				new_active = idx
+			end
+		end
+	end
+
+	if new_active then
+		hl.dispatch(hl.dsp.focus({ workspace = new_active }))
+	end
+
+	compacting = false
+end
+
+hl.on("workspace.removed", function()
+	-- piccolo ritardo per lasciare a Hyprland il tempo di distruggere il workspace
+	hl.timer(compact_workspaces, { timeout = 50, type = "oneshot" })
+end)
+
+--------------------------
+---- COLORI DINAMICI ----
+--------------------------
+-- Impostazioni generate da DankMaterialShell (prima non venivano caricate!)
+for _, mod in ipairs({ "dms.colors", "dms.layout", "dms.cursor", "dms.binds-user", "dms.windowrules" }) do
+	local ok, err = pcall(require, mod)
+	if not ok then
+		print("errore caricando " .. mod .. ": " .. tostring(err))
+	end
+end
+
+-- dms/colors.lua contiene il colore primario estratto dallo sfondo (matugen).
+-- Lo trasformiamo in un gradiente che ruota (animazione "borderangle" sopra).
+do
+	local f = io.open(os.getenv("HOME") .. "/.config/hypr/dms/colors.lua", "r")
+	if f then
+		local txt = f:read("*a")
+		f:close()
+		local primary = txt:match('active_border%s*=%s*"rgb%((%x+)%)"')
+		local inactive = txt:match('inactive_border%s*=%s*"rgb%((%x+)%)"')
+		if primary and inactive then
+			hl.config({
+				general = {
+					col = {
+						active_border = {
+							colors = { "rgba(" .. primary .. "ff)", "rgba(" .. inactive .. "66)", "rgba(" .. primary .. "ff)" },
+							angle = 45,
+						},
+						inactive_border = "rgba(" .. inactive .. "55)",
+					},
+				},
+			})
+		end
+	end
+end
