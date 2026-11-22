@@ -600,7 +600,7 @@
       ],
       "spacing": 1,
       "innerPadding": 3,
-      "bottomGap": -3,
+      "bottomGap": -8,
       "transparency": 0,
       "widgetTransparency": 0,
       "squareCorners": false,
