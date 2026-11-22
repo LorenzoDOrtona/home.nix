@@ -1,5 +1,8 @@
 { config, pkgs, ... }:
 
+let
+  dotfiles = "${config.home.homeDirectory}/Documents/git/dotfiles";
+in
 {
   home.username = "lollodo";
   home.homeDirectory = "/home/lollodo";
@@ -38,13 +41,16 @@
   ];
 
   # Collegamento dichiarativo dei tuoi dotfiles
-  # Nix creerà symlink in ~/.config puntando alle copie riproducibili
-  xdg.configFile."hypr".source = ./configs/hypr;
-  xdg.configFile."kitty".source = ./configs/kitty;
-  xdg.configFile."nvim".source = ./configs/nvim;
-  xdg.configFile."waybar".source = ./configs/waybar;
-  xdg.configFile."DankMaterialShell".source = ./configs/DankMaterialShell;
+  # Usiamo mkOutOfStoreSymlink per permettere a DMS e alle app di salvare file e impostazioni al volo
+  xdg.configFile."hypr".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/hypr";
+  xdg.configFile."kitty".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/kitty";
+  xdg.configFile."nvim".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/nvim";
+  xdg.configFile."waybar".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/waybar";
+  xdg.configFile."DankMaterialShell".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/DankMaterialShell";
 
   # Zsh configuration
-  home.file.".zshrc".source = ./configs/zsh/.zshrc;
+  home.file.".zshrc".source = config.lib.file.mkOutOfStoreSymlink "${dotfiles}/configs/zsh/.zshrc";
+
+  # Servizio Syncthing in background
+  services.syncthing.enable = true;
 }
